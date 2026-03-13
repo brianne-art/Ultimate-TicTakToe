@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ultimate Tic-Tac-Toe</title>
+  <style>
+    /* ── Reset & base ─────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 24px 16px 48px;
+      background: #0f172a;
+      color: #e2e8f0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+
+    h1 {
+      font-size: clamp(1.4rem, 4vw, 2rem);
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: #f8fafc;
+      margin-bottom: 6px;
+    }
+
+    /* ── Status bar ───────────────────────────────────────── */
+    #status-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 36px;
+      margin-bottom: 16px;
+    }
+
+    #status {
+      font-size: 1.05rem;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+
+    #thinking-indicator {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      color: #38bdf8;
+      font-size: 0.9rem;
+    }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid #38bdf8;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Meta board ───────────────────────────────────────── */
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      background: #1e293b;
+      border: 3px solid #334155;
+      border-radius: 12px;
+      padding: 10px;
+      width: min(540px, 96vw);
+    }
+
+    /* ── Sub-board ────────────────────────────────────────── */
+    .sub-board {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 3px;
+      background: #1e293b;
+      border: 2px solid #334155;
+      border-radius: 8px;
+      padding: 5px;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .sub-board.active {
+      border-color: #38bdf8;
+      background: #0c2238;
+    }
+
+    .sub-board.won-x {
+      border-color: #4ade80;
+      background: #052e16;
+    }
+
+    .sub-board.won-o {
+      border-color: #f87171;
+      background: #2d0a0a;
+    }
+
+    .sub-board.drawn {
+      border-color: #475569;
+      background: #1a2336;
+      opacity: 0.6;
+    }
+
+    /* ── Sub-board winner overlay ─────────────────────────── */
+    .sub-winner-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(2rem, 8vw, 3.5rem);
+      font-weight: 900;
+      border-radius: 6px;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .sub-winner-overlay.player-x {
+      color: #4ade80;
+      background: rgba(5, 46, 22, 0.82);
+    }
+
+    .sub-winner-overlay.player-o {
+      color: #f87171;
+      background: rgba(45, 10, 10, 0.82);
+    }
+
+    /* ── Cells ────────────────────────────────────────────── */
+    .cell {
+      aspect-ratio: 1;
+      border: none;
+      border-radius: 5px;
+      background: #0f172a;
+      color: #e2e8f0;
+      font-size: clamp(0.9rem, 3vw, 1.3rem);
+      font-weight: 700;
+      cursor: default;
+      transition: background 0.1s;
+    }
+
+    .cell.legal {
+      background: #1e3a5f;
+      cursor: pointer;
+    }
+
+    .cell.legal:hover {
+      background: #1d4ed8;
+    }
+
+    .cell.player-x { color: #4ade80; }
+    .cell.player-o { color: #f87171; }
+
+    .cell:disabled { opacity: 1; }
+
+    /* ── Settings panel ───────────────────────────────────── */
+    #settings {
+      margin-top: 22px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 16px 20px;
+      width: min(540px, 96vw);
+    }
+
+    #settings h2 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #64748b;
+      margin-bottom: 14px;
+    }
+
+    .settings-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .difficulty-btn {
+      padding: 5px 14px;
+      border-radius: 6px;
+      border: 1px solid #334155;
+      background: #0f172a;
+      color: #94a3b8;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background 0.1s, color 0.1s, border-color 0.1s;
+    }
+
+    .difficulty-btn.active,
+    .difficulty-btn:hover {
+      background: #1d4ed8;
+      border-color: #3b82f6;
+      color: #fff;
+    }
+
+    .slider-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    .slider-group label {
+      font-size: 0.82rem;
+      color: #64748b;
+      white-space: nowrap;
+    }
+
+    #iterations-slider {
+      width: 120px;
+      accent-color: #3b82f6;
+    }
+
+    #iterations-label {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      min-width: 36px;
+      text-align: right;
+    }
+
+    /* ── Toolbar ──────────────────────────────────────────── */
+    #toolbar {
+      margin-top: 14px;
+      width: min(540px, 96vw);
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    #new-game-btn {
+      padding: 7px 20px;
+      border-radius: 7px;
+      border: 1px solid #334155;
+      background: #1e293b;
+      color: #94a3b8;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.1s, color 0.1s;
+    }
+
+    #new-game-btn:hover {
+      background: #334155;
+      color: #e2e8f0;
+    }
+
+    /* ── Game-over overlay ────────────────────────────────── */
+    #game-over-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    #game-over-card {
+      background: #1e293b;
+      border: 2px solid #334155;
+      border-radius: 16px;
+      padding: 40px 48px;
+      text-align: center;
+    }
+
+    #game-over-message {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 24px;
+      color: #f8fafc;
+    }
+
+    #play-again-btn {
+      padding: 12px 32px;
+      border-radius: 8px;
+      border: none;
+      background: #1d4ed8;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    #play-again-btn:hover { background: #2563eb; }
+
+    /* ── Debug panel ──────────────────────────────────────── */
+    .debug-label {
+      font-size: 0.85rem;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .debug-label input { accent-color: #3b82f6; cursor: pointer; }
+
+    #debug-panel {
+      margin-top: 14px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 16px 20px;
+      width: min(540px, 96vw);
+    }
+
+    #debug-panel h2 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #64748b;
+      margin-bottom: 12px;
+    }
+
+    #debug-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+
+    #debug-table th {
+      text-align: left;
+      color: #475569;
+      font-weight: 600;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #334155;
+    }
+
+    #debug-table td {
+      padding: 5px 0;
+      color: #94a3b8;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    #debug-table tr.best-move td { color: #f8fafc; font-weight: 600; }
+
+    .score-bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .score-bar {
+      height: 8px;
+      background: #3b82f6;
+      border-radius: 4px;
+      min-width: 2px;
+      max-width: 120px;
+      flex-shrink: 0;
+    }
+
+    /* ── Mobile tweaks ────────────────────────────────────── */
+    @media (max-width: 420px) {
+      #board { gap: 6px; padding: 6px; }
+      .sub-board { gap: 2px; padding: 3px; }
+      #settings { padding: 12px 14px; }
+      .settings-row { gap: 8px; }
+      .slider-group { margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Ultimate Tic-Tac-Toe</h1>
+
+  <div id="status-bar">
+    <span id="status">Your turn (X)</span>
+    <div id="thinking-indicator">
+      <div class="spinner"></div>
+      <span>Thinking…</span>
+    </div>
+  </div>
+
+  <div id="board"></div>
+
+  <div id="toolbar">
+    <button id="new-game-btn">New Game</button>
+  </div>
+
+  <div id="settings">
+    <h2>Difficulty</h2>
+    <div class="settings-row">
+      <button class="difficulty-btn" data-iters="200">Easy</button>
+      <button class="difficulty-btn" data-iters="800">Medium</button>
+      <button class="difficulty-btn" data-iters="3000">Hard</button>
+      <div class="slider-group">
+        <label for="iterations-slider">Custom:</label>
+        <input id="iterations-slider" type="range" min="100" max="5000" step="100" />
+        <span id="iterations-label">800</span>
+      </div>
+    </div>
+    <div class="settings-row" style="margin-top:12px;">
+      <label class="debug-label">
+        <input type="checkbox" id="debug-toggle" />
+        Show MCTS move stats after each AI turn
+      </label>
+    </div>
+  </div>
+
+  <!-- MCTS debug panel -->
+  <div id="debug-panel" style="display:none;">
+    <h2>MCTS Move Stats <span style="font-weight:400;color:#64748b">(top 10 by avg score)</span></h2>
+    <table id="debug-table">
+      <thead>
+        <tr><th>Move</th><th>Visits</th><th>Avg Score</th></tr>
+      </thead>
+      <tbody id="debug-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- Game-over modal -->
+  <div id="game-over-overlay">
+    <div id="game-over-card">
+      <div id="game-over-message"></div>
+      <button id="play-again-btn">Play Again</button>
+    </div>
+  </div>
+
+  <script type="module" src="./ui.js"></script>
+</body>
+</html>
